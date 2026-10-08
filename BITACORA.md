@@ -28,6 +28,8 @@ Después de cada cambio ejecuta `pytest` y anota el resultado.
 
 | 3  | «Haz la siguiente refactorización.» (eliminar código muerto, según la prioridad acordada en el diagnóstico) | Se eliminaron cuatro piezas de código que nadie invoca: la función `calcular_descuento_viejo` (fórmula de descuentos vigente hasta 2023), la función `reporteViejoCSV`, la bandera global `MODO_DEBUG` y el bloque comentado `exportar_txt`. De paso se quitó el `import os` de `reportes.py`, que quedaba sin uso. En total, ~25 líneas menos. | El código muerto miente sobre el sistema: `calcular_descuento_viejo` sugiere que existe una segunda regla de descuentos vigente, y `MODO_DEBUG` insinúa un modo de depuración que nunca se lee. Ambos obligan a quien lee el módulo a razonar sobre rutas que no existen, y a quien refactoriza, a mantenerlas. El historial de git ya conserva el código si alguna vez hiciera falta, así que «dejarlo por si acaso» no aporta nada. Se verificó con una búsqueda en todo el proyecto que ninguno tuviera una sola llamada. | 20/20 ✔ |
 
+| 4  | «Continúa con la #4.» (constantes con nombre para los números mágicos) | Se declararon 11 constantes al inicio de `src/gestor.py`, agrupadas bajo el encabezado «Reglas de negocio de la tienda»: `MONTO_DESCUENTO_ALTO`, `TASA_DESCUENTO_ALTO`, `MONTO_DESCUENTO_MEDIO`, `TASA_DESCUENTO_MEDIO`, `PREFIJO_CLIENTE_VIP`, `MONTO_MINIMO_VIP`, `TASA_DESCUENTO_VIP`, `TASA_IVA`, `STOCK_MINIMO`, `DECIMALES_MONEDA` y `FORMATO_FECHA`. Se sustituyeron todas sus apariciones en `gestor.py` y `reportes.py`. | Los literales no decían qué significaban: `0.16` podía ser el IVA o cualquier otra tasa, y `500` convivía con `200` sin que el lector supiera cuál era un umbral de volumen y cuál un mínimo VIP. Más grave aún, **el `5` del stock mínimo estaba escrito dos veces** en `reportes.py` (en `productos_stock_bajo` y en `reporte_inventario`): cambiar el umbral en un solo sitio habría hecho que la alerta del reporte dejara de coincidir con la lista de productos en riesgo. Ahora cada regla vive en un solo lugar y su nombre explica la intención. | 20/20 ✔ |
+
 > Agrega más filas si realizas más de 5 refactorizaciones.
 
 ### Detalle de la refactorización #2
@@ -64,6 +66,33 @@ conviene preguntarse si ese código debe existir.
 `tests/`) y los cuatro aparecían únicamente en su propia definición, con cero
 llamadas. `MODO_DEBUG` tampoco se persiste en el JSON: `almacen.guardar_datos`
 solo escribe inventario, ventas y contador.
+
+### Detalle de la refactorización #4
+
+**Efecto medible**
+
+| Métrica | Antes | Después |
+|---------|-------|---------|
+| `pytest` | 20/20 | 20/20 |
+| `ruff check src` | 12 errores | 12 errores |
+| Literales mágicos en `src/` | 15 apariciones | 0 |
+| Lugares donde vive el umbral de stock bajo | 2 | 1 |
+
+Esta refactorización **no cierra ningún error de ruff**, y eso es esperable: el
+linter no tiene forma de saber que `0.16` es una tasa de IVA. Es un buen
+recordatorio de que *pasar el linter* y *tener código legible* son objetivos
+distintos, y que el primero no implica el segundo.
+
+**Dónde viven las constantes.** Se colocaron en `gestor.py`, no en `reportes.py`,
+aunque `STOCK_MINIMO` y `DECIMALES_MONEDA` se consuman desde allí. El criterio es
+que son reglas de negocio, no decisiones de presentación: `reportes.py` ya
+importa `gestor` y ahora las referencia como `gestor.STOCK_MINIMO`. Así el
+reporte y la alerta de inventario no pueden volver a desincronizarse.
+
+**Validación de equivalencia.** Se volvió a correr el barrido de 8 569
+combinaciones contra la fórmula original: resultado idéntico. Además se verificó
+con una búsqueda por expresión regular que no quedara ningún literal mágico
+suelto en `src/`.
 
 **Validación de equivalencia.** La suite solo ejerce cuatro montos concretos, así
 que para comprobar que el comportamiento observable no cambió se comparó la

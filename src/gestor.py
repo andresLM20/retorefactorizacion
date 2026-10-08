@@ -9,6 +9,31 @@ from datetime import datetime
 from typing import NamedTuple
 
 # ---------------------------------------------------------------
+# Reglas de negocio de la tienda
+# ---------------------------------------------------------------
+# Descuento por volumen de compra: se aplica sobre el subtotal.
+MONTO_DESCUENTO_ALTO = 1000
+TASA_DESCUENTO_ALTO = 0.10
+MONTO_DESCUENTO_MEDIO = 500
+TASA_DESCUENTO_MEDIO = 0.05
+
+# Extra para clientes VIP, solo si la compra ya con descuento supera el minimo.
+PREFIJO_CLIENTE_VIP = "VIP"
+MONTO_MINIMO_VIP = 200
+TASA_DESCUENTO_VIP = 0.02
+
+TASA_IVA = 0.16
+
+# Un producto se considera en riesgo cuando baja de esta cantidad de unidades.
+STOCK_MINIMO = 5
+
+# Los importes se manejan en pesos y centavos.
+DECIMALES_MONEDA = 2
+
+FORMATO_FECHA = "%Y-%m-%d %H:%M:%S"
+
+
+# ---------------------------------------------------------------
 # Estado global de la aplicacion (inventario, ventas y contadores)
 # ---------------------------------------------------------------
 INVENTARIO = {}
@@ -98,20 +123,20 @@ class ImportesVenta(NamedTuple):
 
 def _descuento_por_volumen(subtotal):
     """Descuento que corresponde al monto de la compra."""
-    if subtotal >= 1000:
-        return subtotal * 0.10
-    if subtotal >= 500:
-        return subtotal * 0.05
+    if subtotal >= MONTO_DESCUENTO_ALTO:
+        return subtotal * TASA_DESCUENTO_ALTO
+    if subtotal >= MONTO_DESCUENTO_MEDIO:
+        return subtotal * TASA_DESCUENTO_MEDIO
     return 0
 
 
 def _descuento_extra_vip(subtotal, descuento, cliente):
     """Extra para clientes VIP, solo si la compra ya con descuento es grande."""
-    if not cliente or not cliente.startswith("VIP"):
+    if not cliente or not cliente.startswith(PREFIJO_CLIENTE_VIP):
         return 0
-    if subtotal - descuento <= 200:
+    if subtotal - descuento <= MONTO_MINIMO_VIP:
         return 0
-    return subtotal * 0.02
+    return subtotal * TASA_DESCUENTO_VIP
 
 
 def calcular_importes(precio, cantidad, cliente=""):
@@ -125,12 +150,12 @@ def calcular_importes(precio, cantidad, cliente=""):
     descuento = _descuento_por_volumen(subtotal)
     descuento = descuento + _descuento_extra_vip(subtotal, descuento, cliente)
     base = subtotal - descuento
-    impuesto = base * 0.16
+    impuesto = base * TASA_IVA
     return ImportesVenta(
         subtotal=subtotal,
         descuento=descuento,
         impuesto=impuesto,
-        total=round(base + impuesto, 2),
+        total=round(base + impuesto, DECIMALES_MONEDA),
     )
 
 
@@ -170,12 +195,12 @@ def registrar_venta(codigo, cantidad, cliente=""):
     venta["codigo"] = codigo
     venta["nombre"] = temp2["nombre"]
     venta["cantidad"] = cantidad
-    venta["subtotal"] = round(importes.subtotal, 2)
-    venta["descuento"] = round(importes.descuento, 2)
-    venta["impuesto"] = round(importes.impuesto, 2)
+    venta["subtotal"] = round(importes.subtotal, DECIMALES_MONEDA)
+    venta["descuento"] = round(importes.descuento, DECIMALES_MONEDA)
+    venta["impuesto"] = round(importes.impuesto, DECIMALES_MONEDA)
     venta["total"] = importes.total
     venta["cliente"] = cliente
-    venta["fecha"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    venta["fecha"] = datetime.now().strftime(FORMATO_FECHA)
     # armar el ticket en texto plano
     t = ""
     t = t + "TIENDA LA ESQUINA\n"
