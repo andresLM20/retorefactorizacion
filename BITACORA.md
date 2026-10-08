@@ -32,6 +32,8 @@ Después de cada cambio ejecuta `pytest` y anota el resultado.
 
 | 5  | «Sí, continúa.» (guard clauses en la validación de `registrar_venta`) | Se aplanó la pirámide de 4 `if` anidados de la entrada de `registrar_venta` convirtiéndola en cuatro guard clauses consecutivas, cada una con su mensaje de error y su `return None`. Desapareció la variable `temp2 = None`, que solo existía para cargar el producto desde el fondo del anidamiento; ahora el producto se obtiene con `producto = INVENTARIO[codigo]` una vez superadas las validaciones. | El patrón anidado obligaba a leer la función de adentro hacia afuera: el caso exitoso estaba cuatro niveles adentro y los errores quedaban en los `else`, lejos de la condición que los provocaba. Con guard clauses cada regla de rechazo se lee en dos líneas contiguas —condición y consecuencia— y el cuerpo real de la función queda al nivel base, sin indentación. También elimina la variable centinela `temp2 = None`, que era un residuo del anidamiento. | 20/20 ✔ |
 
+| 6  | «Sí.» (partir `registrar_venta` extrayendo la construcción del registro y del ticket) | Se extrajeron dos funciones de `registrar_venta`: `_construir_registro_venta`, que arma el diccionario que se guarda en `VENTAS` con los importes ya redondeados, y `_generar_ticket`, que produce el texto del comprobante. El ticket pasó de nueve concatenaciones sucesivas sobre una variable `t` a una lista de líneas unida con `"\n".join(...)`. `registrar_venta` quedó como orquestador: valida, calcula, aplica efectos y delega. | `registrar_venta` seguía haciendo tres trabajos de naturaleza distinta: reglas de negocio (descontar stock, asignar folio), estructura de datos (armar el registro) y **presentación** (formatear un ticket para imprimir). Mezclar presentación con lógica de negocio es el acoplamiento más caro del módulo: cambiar el diseño del comprobante obligaba a editar la función que mueve el inventario, con el riesgo de romper una venta por tocar un texto. Ahora el formato del ticket vive en un solo lugar y se puede cambiar sin entrar al flujo de la venta. | 20/20 ✔ |
+
 > Agrega más filas si realizas más de 5 refactorizaciones.
 
 ### Detalle de la refactorización #2
@@ -125,6 +127,38 @@ contra las guard clauses en **66 combinaciones** de código y cantidad —incluy
 `None`, `""`, el entero `0`, cantidades negativas y un producto con stock 0—
 verificando en cada caso el mensaje de error exacto y que una venta rechazada no
 dejara efectos laterales en el stock ni en `VENTAS`. Resultado: idéntico.
+
+### Detalle de la refactorización #6
+
+**Efecto medible**
+
+| Métrica | Antes | Después |
+|---------|-------|---------|
+| `pytest` | 20/20 | 20/20 |
+| `ruff check src` | 12 errores | 12 errores |
+| Cuerpo de `registrar_venta` | 30 líneas | 11 líneas |
+| Complejidad de `registrar_venta` | 6 | 5 |
+| Responsabilidades en `registrar_venta` | 3 | 1 (orquestar) |
+
+**Validación byte a byte del ticket.** El ticket es una cadena que el menú
+imprime tal cual, así que cualquier diferencia de un espacio o un salto de línea
+sería un cambio de comportamiento observable. Para comprobarlo se cargó el
+`gestor.py` del commit anterior como **módulo paralelo** (vía `importlib`) y se
+ejecutaron ambas versiones sobre los mismos 10 escenarios —sin descuento, con
+descuento medio y alto, con y sin cliente VIP, un VIP bajo el mínimo y un
+producto con nombre largo—, comparando el ticket carácter por carácter.
+Resultado: idéntico.
+
+**También se comparó el orden de las claves del diccionario**, no solo sus
+valores. Importa porque `almacen.guardar_datos` serializa `VENTAS` a JSON y los
+diccionarios de Python conservan el orden de inserción: reordenar las claves
+habría cambiado el archivo de datos generado, aunque ninguna prueba lo detectara.
+
+**Detalle de diseño.** `_generar_ticket` recibe `mostrar_descuento` como
+parámetro aparte en vez de deducirlo del registro. La razón es sutil: la decisión
+de imprimir la línea de descuento depende del descuento **sin redondear**,
+mientras que el registro guarda el redondeado. Deducirlo dentro de la función
+habría cambiado el comportamiento para descuentos menores a medio centavo.
 
 **Validación de equivalencia.** La suite solo ejerce cuatro montos concretos, así
 que para comprobar que el comportamiento observable no cambió se comparó la

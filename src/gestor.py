@@ -159,13 +159,48 @@ def calcular_importes(precio, cantidad, cliente=""):
     )
 
 
+def _construir_registro_venta(folio, codigo, producto, cantidad, cliente, importes):
+    """Arma el registro que se guarda en VENTAS, con los importes ya redondeados."""
+    return {
+        "folio": folio,
+        "codigo": codigo,
+        "nombre": producto["nombre"],
+        "cantidad": cantidad,
+        "subtotal": round(importes.subtotal, DECIMALES_MONEDA),
+        "descuento": round(importes.descuento, DECIMALES_MONEDA),
+        "impuesto": round(importes.impuesto, DECIMALES_MONEDA),
+        "total": importes.total,
+        "cliente": cliente,
+        "fecha": datetime.now().strftime(FORMATO_FECHA),
+    }
+
+
+def _generar_ticket(venta, mostrar_descuento):
+    """Arma el ticket en texto plano a partir de un registro de venta.
+
+    `mostrar_descuento` se recibe aparte porque depende del descuento sin
+    redondear, no del que quedo guardado en el registro.
+    """
+    lineas = [
+        "TIENDA LA ESQUINA",
+        "----------------------------",
+        "Folio: " + str(venta["folio"]),
+        venta["nombre"] + " x" + str(venta["cantidad"]),
+        "Subtotal: $" + str(venta["subtotal"]),
+    ]
+    if mostrar_descuento:
+        lineas.append("Descuento: -$" + str(venta["descuento"]))
+    lineas.append("IVA: $" + str(venta["impuesto"]))
+    lineas.append("TOTAL: $" + str(venta["total"]))
+    return "\n".join(lineas) + "\n"
+
+
 def registrar_venta(codigo, cantidad, cliente=""):
     """Registra una venta completa.
 
-    Valida los datos, delega el calculo a `calcular_importes`, descuenta el
-    stock, genera el folio, arma el ticket en texto y guarda el registro en
-    la lista de ventas. Si algo falla regresa None y deja el motivo en
-    ultimo_error.
+    Orquesta los pasos: valida los datos, calcula los importes, descuenta el
+    stock, genera el folio y delega el armado del registro y del ticket. Si
+    algo falla regresa None y deja el motivo en ultimo_error.
     """
     global contadorVentas, ultimo_error
     if codigo is None or codigo == "":
@@ -186,29 +221,10 @@ def registrar_venta(codigo, cantidad, cliente=""):
     # descontar del inventario
     producto["stock"] = producto["stock"] - cantidad
     contadorVentas = contadorVentas + 1
-    venta = {}
-    venta["folio"] = contadorVentas
-    venta["codigo"] = codigo
-    venta["nombre"] = producto["nombre"]
-    venta["cantidad"] = cantidad
-    venta["subtotal"] = round(importes.subtotal, DECIMALES_MONEDA)
-    venta["descuento"] = round(importes.descuento, DECIMALES_MONEDA)
-    venta["impuesto"] = round(importes.impuesto, DECIMALES_MONEDA)
-    venta["total"] = importes.total
-    venta["cliente"] = cliente
-    venta["fecha"] = datetime.now().strftime(FORMATO_FECHA)
-    # armar el ticket en texto plano
-    t = ""
-    t = t + "TIENDA LA ESQUINA\n"
-    t = t + "----------------------------\n"
-    t = t + "Folio: " + str(venta["folio"]) + "\n"
-    t = t + venta["nombre"] + " x" + str(cantidad) + "\n"
-    t = t + "Subtotal: $" + str(venta["subtotal"]) + "\n"
-    if importes.descuento > 0:
-        t = t + "Descuento: -$" + str(venta["descuento"]) + "\n"
-    t = t + "IVA: $" + str(venta["impuesto"]) + "\n"
-    t = t + "TOTAL: $" + str(venta["total"]) + "\n"
-    venta["ticket"] = t
+    venta = _construir_registro_venta(
+        contadorVentas, codigo, producto, cantidad, cliente, importes
+    )
+    venta["ticket"] = _generar_ticket(venta, importes.descuento > 0)
     VENTAS.append(venta)
     return venta
 
