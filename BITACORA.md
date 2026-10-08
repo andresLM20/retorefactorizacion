@@ -26,6 +26,8 @@ Después de cada cambio ejecuta `pytest` y anota el resultado.
 | 1  | «Dame un diagnóstico: qué *code smells* detectas y recomiéndame 10 refactorizaciones. Prioriza.» | Diagnóstico sin cambios en el código: mapeo de los 20 errores de ruff a los módulos, identificación de 10 smells estructurales que ruff no detecta y plan priorizado de 10 refactorizaciones por impacto/riesgo. | Refactorizar sin diagnóstico previo lleva a tocar lo cosmético y dejar lo estructural. El orden importa: eliminar código muerto antes de refactorizar evita trabajar sobre funciones que nadie llama, y extraer el cálculo duplicado antes de partir `registrar_venta` hace que los pasos siguientes sean más pequeños. | 20/20 ✔ (sin cambios en `src/`) |
 | 2  | «Empecemos aplicando la primera refactorización: extraer el motor de cálculo a una sola función.» | Se extrajo todo el cálculo económico de `registrar_venta` y `cotizar` a una sola función `calcular_importes(precio, cantidad, cliente="")` en `src/gestor.py`, apoyada en dos auxiliares (`_descuento_por_volumen` y `_descuento_extra_vip`) y en un `NamedTuple` `ImportesVenta` que transporta el desglose. `registrar_venta` pasó de 21 líneas de cálculo a 1; `cotizar` pasó de 10 líneas a 1. | **Elimina la duplicación más grave del proyecto.** La regla de descuentos e IVA estaba escrita dos veces, con dos redacciones distintas del mismo `if/else`: cambiar la tasa de IVA obligaba a editar dos lugares y olvidar uno producía cotizaciones que no coincidían con el cobro (precisamente lo que vigila `test_cotizar_coincide_con_el_total_de_la_venta`). Ahora hay una sola fuente de verdad. Además aplana la pirámide de 4 `if` anidados del bloque VIP convirtiéndola en guard clauses, lo que baja la complejidad de `registrar_venta` de 12 a por debajo del límite. | 20/20 ✔ |
 
+| 3  | «Haz la siguiente refactorización.» (eliminar código muerto, según la prioridad acordada en el diagnóstico) | Se eliminaron cuatro piezas de código que nadie invoca: la función `calcular_descuento_viejo` (fórmula de descuentos vigente hasta 2023), la función `reporteViejoCSV`, la bandera global `MODO_DEBUG` y el bloque comentado `exportar_txt`. De paso se quitó el `import os` de `reportes.py`, que quedaba sin uso. En total, ~25 líneas menos. | El código muerto miente sobre el sistema: `calcular_descuento_viejo` sugiere que existe una segunda regla de descuentos vigente, y `MODO_DEBUG` insinúa un modo de depuración que nunca se lee. Ambos obligan a quien lee el módulo a razonar sobre rutas que no existen, y a quien refactoriza, a mantenerlas. El historial de git ya conserva el código si alguna vez hiciera falta, así que «dejarlo por si acaso» no aporta nada. Se verificó con una búsqueda en todo el proyecto que ninguno tuviera una sola llamada. | 20/20 ✔ |
+
 > Agrega más filas si realizas más de 5 refactorizaciones.
 
 ### Detalle de la refactorización #2
@@ -41,6 +43,27 @@ Después de cada cambio ejecuta `pytest` y anota el resultado.
 
 Errores de ruff cerrados por este cambio: `C901` en `registrar_venta`, `SIM108`
 (ternario) y los tres `SIM102` (ifs colapsables).
+
+### Detalle de la refactorización #3
+
+**Efecto medible**
+
+| Métrica | Antes | Después |
+|---------|-------|---------|
+| `pytest` | 20/20 | 20/20 |
+| `ruff check src` | 15 errores | 12 errores |
+| Líneas en `src/` | — | ~25 menos |
+
+Errores de ruff cerrados: `N802` (`reporteViejoCSV` no era snake_case), `SIM115`
+(ese mismo archivo abría un CSV sin `with`) y `F401` (`os` importado sin usar).
+Vale la pena notarlo: **borrar la función resolvió dos advertencias que, de otro
+modo, habrían costado una refactorización entera**. Antes de arreglar código
+conviene preguntarse si ese código debe existir.
+
+**Verificación previa.** Se buscó cada nombre en todo el proyecto (`src/` y
+`tests/`) y los cuatro aparecían únicamente en su propia definición, con cero
+llamadas. `MODO_DEBUG` tampoco se persiste en el JSON: `almacen.guardar_datos`
+solo escribe inventario, ventas y contador.
 
 **Validación de equivalencia.** La suite solo ejerce cuatro montos concretos, así
 que para comprobar que el comportamiento observable no cambió se comparó la
