@@ -1,0 +1,56 @@
+# Archivos que Claude Code no debe leer ni indexar en este proyecto.
+# Nada aquí aporta contexto para refactorizar src/, y leerlo solo gasta
+# ventana de contexto o induce a modificar lo que no se debe tocar.
+
+# --- Entornos virtuales y dependencias de terceros ---
+# Miles de archivos de librerías instaladas: ruido puro.
+.venv/
+venv/
+env/
+ENV/
+site-packages/
+
+# --- Cachés y artefactos generados ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+*.egg-info/
+
+# --- Reportes de cobertura ---
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# --- Datos generados en tiempo de ejecución ---
+# main.py reescribe datos_ejemplo.json al salir; su contenido cambia con el uso
+# y no es fuente de verdad para refactorizar. Los respaldos, menos aún.
+*.bak
+datos_local*.json
+datos_backup*.json
+*.log
+
+# --- Basura del sistema operativo ---
+# El ZIP original del reto venía con estos archivos de macOS.
+.DS_Store
+__MACOSX/
+._*
+Thumbs.db
+desktop.ini
+
+# --- Control de versiones y configuración local ---
+.git/
+.claude/settings.local.json
+.vscode/
+.idea/
+
+# NOTA: tests/ y pyproject.toml NO se ignoran a propósito.
+# Claude debe poder LEERLOS para entender qué comportamiento está fijado y qué
+# reglas de ruff aplican. La prohibición de modificarlos vive en CLAUDE.md,
+# que es donde corresponde: ignorarlos lo dejaría refactorizando a ciegas.
