@@ -30,6 +30,8 @@ Después de cada cambio ejecuta `pytest` y anota el resultado.
 
 | 4  | «Continúa con la #4.» (constantes con nombre para los números mágicos) | Se declararon 11 constantes al inicio de `src/gestor.py`, agrupadas bajo el encabezado «Reglas de negocio de la tienda»: `MONTO_DESCUENTO_ALTO`, `TASA_DESCUENTO_ALTO`, `MONTO_DESCUENTO_MEDIO`, `TASA_DESCUENTO_MEDIO`, `PREFIJO_CLIENTE_VIP`, `MONTO_MINIMO_VIP`, `TASA_DESCUENTO_VIP`, `TASA_IVA`, `STOCK_MINIMO`, `DECIMALES_MONEDA` y `FORMATO_FECHA`. Se sustituyeron todas sus apariciones en `gestor.py` y `reportes.py`. | Los literales no decían qué significaban: `0.16` podía ser el IVA o cualquier otra tasa, y `500` convivía con `200` sin que el lector supiera cuál era un umbral de volumen y cuál un mínimo VIP. Más grave aún, **el `5` del stock mínimo estaba escrito dos veces** en `reportes.py` (en `productos_stock_bajo` y en `reporte_inventario`): cambiar el umbral en un solo sitio habría hecho que la alerta del reporte dejara de coincidir con la lista de productos en riesgo. Ahora cada regla vive en un solo lugar y su nombre explica la intención. | 20/20 ✔ |
 
+| 5  | «Sí, continúa.» (guard clauses en la validación de `registrar_venta`) | Se aplanó la pirámide de 4 `if` anidados de la entrada de `registrar_venta` convirtiéndola en cuatro guard clauses consecutivas, cada una con su mensaje de error y su `return None`. Desapareció la variable `temp2 = None`, que solo existía para cargar el producto desde el fondo del anidamiento; ahora el producto se obtiene con `producto = INVENTARIO[codigo]` una vez superadas las validaciones. | El patrón anidado obligaba a leer la función de adentro hacia afuera: el caso exitoso estaba cuatro niveles adentro y los errores quedaban en los `else`, lejos de la condición que los provocaba. Con guard clauses cada regla de rechazo se lee en dos líneas contiguas —condición y consecuencia— y el cuerpo real de la función queda al nivel base, sin indentación. También elimina la variable centinela `temp2 = None`, que era un residuo del anidamiento. | 20/20 ✔ |
+
 > Agrega más filas si realizas más de 5 refactorizaciones.
 
 ### Detalle de la refactorización #2
@@ -93,6 +95,36 @@ reporte y la alerta de inventario no pueden volver a desincronizarse.
 combinaciones contra la fórmula original: resultado idéntico. Además se verificó
 con una búsqueda por expresión regular que no quedara ningún literal mágico
 suelto en `src/`.
+
+### Detalle de la refactorización #5
+
+**Efecto medible**
+
+| Métrica | Antes | Después |
+|---------|-------|---------|
+| `pytest` | 20/20 | 20/20 |
+| `ruff check src` | 12 errores | 12 errores |
+| Profundidad de anidamiento en la validación | 4 niveles | 1 nivel |
+| Complejidad ciclomática de `registrar_venta` | 6 | 6 |
+| Variables centinela | `temp2 = None` | ninguna |
+
+**La complejidad ciclomática no bajó, y es correcto que no lo haga.** Se midió
+con `ruff --select C901 --config "lint.mccabe.max-complexity=1"` (sin modificar
+`pyproject.toml`) antes y después: 6 en ambos casos. Aplanar anidamiento no
+cambia el número de caminos de ejecución, solo la profundidad a la que hay que
+leerlos. La métrica que mejora es el anidamiento, y esa McCabe no la mide. Es un
+ejemplo claro de que una refactorización puede ser valiosa sin mover ni una
+métrica automática.
+
+**Validación del orden de las reglas.** Este cambio invierte cuatro condiciones
+booleanas (`codigo is not None and codigo != ""` pasa a `codigo is None or
+codigo == ""`, etc.), que es justo donde se cuelan los errores de signo. Además,
+el **orden** de las validaciones determina qué mensaje queda en `ultimo_error`
+cuando una entrada viola varias reglas a la vez. Se comparó la pirámide original
+contra las guard clauses en **66 combinaciones** de código y cantidad —incluyendo
+`None`, `""`, el entero `0`, cantidades negativas y un producto con stock 0—
+verificando en cada caso el mensaje de error exacto y que una venta rechazada no
+dejara efectos laterales en el stock ni en `VENTAS`. Resultado: idéntico.
 
 **Validación de equivalencia.** La suite solo ejerce cuatro montos concretos, así
 que para comprobar que el comportamiento observable no cambió se comparó la
