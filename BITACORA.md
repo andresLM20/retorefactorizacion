@@ -34,6 +34,8 @@ Después de cada cambio ejecuta `pytest` y anota el resultado.
 
 | 6  | «Sí.» (partir `registrar_venta` extrayendo la construcción del registro y del ticket) | Se extrajeron dos funciones de `registrar_venta`: `_construir_registro_venta`, que arma el diccionario que se guarda en `VENTAS` con los importes ya redondeados, y `_generar_ticket`, que produce el texto del comprobante. El ticket pasó de nueve concatenaciones sucesivas sobre una variable `t` a una lista de líneas unida con `"\n".join(...)`. `registrar_venta` quedó como orquestador: valida, calcula, aplica efectos y delega. | `registrar_venta` seguía haciendo tres trabajos de naturaleza distinta: reglas de negocio (descontar stock, asignar folio), estructura de datos (armar el registro) y **presentación** (formatear un ticket para imprimir). Mezclar presentación con lógica de negocio es el acoplamiento más caro del módulo: cambiar el diseño del comprobante obligaba a editar la función que mueve el inventario, con el riesgo de romper una venta por tocar un texto. Ahora el formato del ticket vive en un solo lugar y se puede cambiar sin entrar al flujo de la venta. | 20/20 ✔ |
 
+| 7  | «Sigamos hasta dejar el linter en cero.» (descomponer `menu()`) | Se partió `menu()` —una cadena de 8 `elif` que mezclaba presentación, lectura de entrada y orquestación— en un handler por opción (`_alta_de_producto`, `_venta`, `_cotizacion`, `_reporte_inventario`, `_resumen_ventas`, `_mas_vendidos`, `_alertas_stock_bajo`, `_guardar_y_salir`) más una tabla de despacho `OPCIONES` que asocia cada tecla con su etiqueta y su acción. El menú en pantalla ahora se genera recorriendo esa tabla, así que agregar una opción es añadir una entrada en un solo lugar. | `menu()` era la función más compleja del proyecto (17, con el límite en 10). La cadena de `elif` obligaba a mantener sincronizados tres sitios separados: el `print` de la etiqueta, la comparación de la tecla y el cuerpo que la atiende; agregar una opción significaba tocar los tres y nada avisaba si uno se olvidaba. Con la tabla de despacho, etiqueta y acción viven juntas y la pantalla se deriva de la misma fuente, de modo que no pueden desincronizarse. | 20/20 ✔ |
+
 > Agrega más filas si realizas más de 5 refactorizaciones.
 
 ### Detalle de la refactorización #2
@@ -159,6 +161,43 @@ parámetro aparte en vez de deducirlo del registro. La razón es sutil: la decis
 de imprimir la línea de descuento depende del descuento **sin redondear**,
 mientras que el registro guarda el redondeado. Deducirlo dentro de la función
 habría cambiado el comportamiento para descuentos menores a medio centavo.
+
+### Detalle de la refactorización #7
+
+**Efecto medible**
+
+| Métrica | Antes | Después |
+|---------|-------|---------|
+| `pytest` | 20/20 | 20/20 |
+| `ruff check src` | 12 errores | 11 errores |
+| Complejidad de `menu` | **17** | **4** |
+| Cuerpo de `menu` | 58 líneas | 11 líneas |
+| Lugares a tocar para agregar una opción | 3 | 1 |
+
+Con esto se cierra el último `C901` del proyecto: ninguna función supera ya el
+límite de complejidad.
+
+**Un bug que la refactorización estuvo a punto de introducir.** El diseño natural
+de una tabla de despacho es `if accion(): break`, usando el valor de retorno del
+handler para decidir si el menú termina. Pero `reportes.reporte_inventario` y
+`reportes.resumen_ventas` **devuelven el texto del reporte** además de
+imprimirlo, y una cadena no vacía es «verdadera» en Python: el menú se habría
+cerrado solo al pedir un reporte. Se corrigió envolviendo ambas en handlers que
+no devuelven nada y comparando con `is True` en vez de confiar en la
+«verdadez» del valor. Es un recordatorio de que una función que *hace algo* y
+además *devuelve algo* es peligrosa cuando se la trata como intercambiable con
+otras.
+
+**Validación sin red de seguridad.** `main.py` no tiene ninguna prueba: la suite
+cubre `gestor`, `almacen` y `reportes`, pero no el menú. Para no refactorizar a
+ciegas se construyó un arnés que ejecuta la versión anterior y la nueva con la
+**misma secuencia de entradas simuladas** (parcheando `input`) y compara la
+salida completa carácter por carácter, además del JSON que queda guardado al
+salir. Se probaron **16 guiones**: alta de producto válida e inválida, producto
+duplicado, venta normal, venta VIP, venta sin stock, producto inexistente,
+cotización válida e inválida, los cuatro reportes, opción inexistente, un número
+mal escrito y un recorrido largo que encadena 17 interacciones. Resultado:
+idéntico en los 16.
 
 **Validación de equivalencia.** La suite solo ejerce cuatro montos concretos, así
 que para comprobar que el comportamiento observable no cambió se comparó la
