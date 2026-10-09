@@ -9,12 +9,13 @@ import gestor
 
 def guardar_datos(ruta):
     """Guarda el inventario, las ventas y el folio actual en un JSON."""
-    d = {}
-    d["inventario"] = gestor.INVENTARIO
-    d["ventas"] = gestor.VENTAS
-    d["contador"] = gestor.contadorVentas
+    datos = {
+        "inventario": gestor.INVENTARIO,
+        "ventas": gestor.VENTAS,
+        "contador": gestor.contador_ventas,
+    }
     with open(ruta, "w", encoding="utf-8") as f:
-        json.dump(d, f, indent=2, ensure_ascii=False)
+        json.dump(datos, f, indent=2, ensure_ascii=False)
     return True
 
 
@@ -31,23 +32,20 @@ def cargar_datos(ruta):
     # abrir. Un error al abrirlo sigue propagandose, como antes.
     with open(ruta, encoding="utf-8") as f:
         try:
-            d = json.load(f)
+            datos = json.load(f)
         except Exception:
             gestor.ultimo_error = "archivo corrupto"
             return False
+    # Se vacian y rellenan en el lugar, sin reasignar: otros modulos y el
+    # fixture de las pruebas guardan una referencia a estas mismas colecciones.
     gestor.INVENTARIO.clear()
-    for k in d["inventario"]:
-        gestor.INVENTARIO[k] = d["inventario"][k]
+    gestor.INVENTARIO.update(datos["inventario"])
     gestor.VENTAS.clear()
-    for v in d["ventas"]:
-        gestor.VENTAS.append(v)
-    gestor.contadorVentas = d.get("contador", 0)
+    gestor.VENTAS.extend(datos["ventas"])
+    gestor.contador_ventas = datos.get("contador", 0)
     return True
 
 
-def hayArchivo(ruta):
-    # checa si ya existe el archivo de datos
-    if os.path.exists(ruta):
-        return True
-    else:
-        return False
+def hay_archivo(ruta):
+    """Indica si ya existe el archivo de datos."""
+    return os.path.exists(ruta)

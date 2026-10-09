@@ -38,6 +38,8 @@ Después de cada cambio ejecuta `pytest` y anota el resultado.
 
 | 8  | (continuación del mismo plan) Manejo de archivos con `with` en `almacen.py` | `guardar_datos` y `cargar_datos` abrían el archivo con `open(...)` y lo cerraban con un `f.close()` manual. Se sustituyeron por bloques `with`, que cierran el descriptor pase lo que pase. De paso se eliminó el modo `"r"` redundante y el `f.close()` duplicado del camino de error. | El `close()` manual solo se ejecuta si el flujo llega hasta él: cualquier excepción entre el `open` y el `close` deja el descriptor colgado. En `guardar_datos` el riesgo era real porque `json.dump` no estaba protegido por ningún `try`. Se comprobó experimentalmente (ver detalle) que, con el código anterior, un fallo de serialización podía dejar el archivo de datos bloqueado. | 20/20 ✔ |
 
+| 9  | (continuación del mismo plan) Renombrado descriptivo y estilo de nombres consistente | Se renombraron la función `hacer_cosa` → `formatear_moneda`, `hayArchivo` → `hay_archivo` y la global `contadorVentas` → `contador_ventas` (actualizando también `almacen.py`, que la lee y la escribe). Se sustituyeron los nombres de una letra y los `temp`/`aux` por nombres que dicen qué contienen: `nuevo_stock`, `valor_total`, `unidades_por_codigo`, `ranking`, `producto`, `venta`, `texto`, `datos`, `respuesta`. De paso, tres bucles que solo acumulaban en una lista se volvieron comprensiones, y `hay_archivo` pasó de un `if/else` que devolvía `True`/`False` a devolver la condición directamente. | Los nombres eran el obstáculo más persistente para leer el código: `temp2` designaba tres cosas distintas en tres funciones y `aux` cuatro, de modo que el lector no podía apoyarse en el nombre para saber qué tenía enfrente y debía reconstruirlo cada vez. `hacer_cosa` era el caso extremo: un nombre que oculta activamente que la función formatea moneda. El estilo también estaba mezclado —`contadorVentas` y `hayArchivo` en camelCase conviviendo con snake_case—, lo que obliga a recordar cuál es cuál al escribir. | 20/20 ✔ |
+
 > Agrega más filas si realizas más de 5 refactorizaciones.
 
 ### Detalle de la refactorización #2
@@ -242,6 +244,44 @@ igual que en el original. Meterlo dentro habría sido más corto, pero habría
 cambiado el comportamiento: un archivo que existe pero no se puede abrir (por
 permisos, o porque otro proceso lo tiene tomado) habría pasado a reportarse como
 «archivo corrupto» en vez de propagar el error real.
+
+### Detalle de la refactorización #9
+
+**Efecto medible**
+
+| Métrica | Antes | Después |
+|---------|-------|---------|
+| `pytest` | 20/20 | 20/20 |
+| `ruff check src` | 8 errores | 5 errores |
+| Nombres en camelCase | 2 (`contadorVentas`, `hayArchivo`) | 0 |
+| Variables `temp`/`aux`/de una letra | 18 | 0 |
+
+Errores cerrados: `N816` (`contadorVentas`), `N802` (`hayArchivo`) y `SIM103`
+(el `if/else` que devolvía `True`/`False`). Los 5 restantes son todos
+auto-corregibles.
+
+**Lo que NO se renombró, y por qué.** `agregarProducto` y `buscarProducto`
+conservan su camelCase: los tests los invocan por ese nombre y `pyproject.toml`
+los declara en `ignore-names` precisamente por eso. Renombrarlos habría roto la
+suite, que no se puede modificar. Es el límite explícito del ejercicio.
+
+**El renombrado más delicado fue `contadorVentas`**, porque no es una variable
+local sino estado de módulo que `almacen.py` lee y escribe como
+`gestor.contadorVentas` en dos puntos. Se verificó antes que los tests no la
+tocaran directamente (sí tocan `INVENTARIO` y `VENTAS`, que por eso no se
+renombraron) y se actualizaron ambos archivos en el mismo commit.
+
+**Un cuidado adicional en `cargar_datos`.** Los bucles que rellenaban
+`INVENTARIO` y `VENTAS` se reemplazaron por `.update()` y `.extend()`, que
+mantienen la mutación **en el lugar**. Era importante no caer en la tentación de
+escribir `gestor.INVENTARIO = datos["inventario"]`: reasignar crearía objetos
+nuevos y el fixture `sistema_limpio` de las pruebas, junto con cualquier módulo
+que guarde una referencia, seguiría apuntando a los viejos.
+
+**Validación.** Además de la suite, se reejecutaron los 16 guiones del menú
+comparando la salida con la versión anterior. Importa aquí porque las opciones
+4 a 7 imprimen los reportes completos, así que los renombrados dentro de
+`reportes.py` quedan verificados carácter por carácter. Resultado: idéntico.
 
 **Validación de equivalencia.** La suite solo ejerce cuatro montos concretos, así
 que para comprobar que el comportamiento observable no cambió se comparó la
