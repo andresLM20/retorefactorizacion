@@ -36,6 +36,8 @@ Después de cada cambio ejecuta `pytest` y anota el resultado.
 
 | 7  | «Sigamos hasta dejar el linter en cero.» (descomponer `menu()`) | Se partió `menu()` —una cadena de 8 `elif` que mezclaba presentación, lectura de entrada y orquestación— en un handler por opción (`_alta_de_producto`, `_venta`, `_cotizacion`, `_reporte_inventario`, `_resumen_ventas`, `_mas_vendidos`, `_alertas_stock_bajo`, `_guardar_y_salir`) más una tabla de despacho `OPCIONES` que asocia cada tecla con su etiqueta y su acción. El menú en pantalla ahora se genera recorriendo esa tabla, así que agregar una opción es añadir una entrada en un solo lugar. | `menu()` era la función más compleja del proyecto (17, con el límite en 10). La cadena de `elif` obligaba a mantener sincronizados tres sitios separados: el `print` de la etiqueta, la comparación de la tecla y el cuerpo que la atiende; agregar una opción significaba tocar los tres y nada avisaba si uno se olvidaba. Con la tabla de despacho, etiqueta y acción viven juntas y la pantalla se deriva de la misma fuente, de modo que no pueden desincronizarse. | 20/20 ✔ |
 
+| 8  | (continuación del mismo plan) Manejo de archivos con `with` en `almacen.py` | `guardar_datos` y `cargar_datos` abrían el archivo con `open(...)` y lo cerraban con un `f.close()` manual. Se sustituyeron por bloques `with`, que cierran el descriptor pase lo que pase. De paso se eliminó el modo `"r"` redundante y el `f.close()` duplicado del camino de error. | El `close()` manual solo se ejecuta si el flujo llega hasta él: cualquier excepción entre el `open` y el `close` deja el descriptor colgado. En `guardar_datos` el riesgo era real porque `json.dump` no estaba protegido por ningún `try`. Se comprobó experimentalmente (ver detalle) que, con el código anterior, un fallo de serialización podía dejar el archivo de datos bloqueado. | 20/20 ✔ |
+
 > Agrega más filas si realizas más de 5 refactorizaciones.
 
 ### Detalle de la refactorización #2
@@ -198,6 +200,48 @@ duplicado, venta normal, venta VIP, venta sin stock, producto inexistente,
 cotización válida e inválida, los cuatro reportes, opción inexistente, un número
 mal escrito y un recorrido largo que encadena 17 interacciones. Resultado:
 idéntico en los 16.
+
+### Detalle de la refactorización #8
+
+**Efecto medible**
+
+| Métrica | Antes | Después |
+|---------|-------|---------|
+| `pytest` | 20/20 | 20/20 |
+| `ruff check src` | 11 errores | 8 errores |
+| Archivos abiertos sin `with` | 2 | 0 |
+
+Errores cerrados: los dos `SIM115` y el `UP015` (modo `"r"` redundante).
+
+**Se intentó demostrar el bug y al principio no apareció.** La primera prueba
+—forzar un `TypeError` dentro de `json.dump` y comprobar si el archivo quedaba
+bloqueado— dio el mismo resultado en ambas versiones: el archivo se cerraba
+bien. La razón es que CPython usa conteo de referencias: al propagarse la
+excepción se destruye el *frame* de la función, con él la variable local `f`, y
+el archivo se cierra solo. El `close()` manual estaba siendo rescatado por un
+detalle de implementación del intérprete.
+
+**Pero sí hay un caso donde falla.** Si el código que llama **retiene el
+traceback** —exactamente lo que hace cualquier manejador que registre el error
+para diagnosticarlo después—, el frame sigue vivo, `f` no se libera y el archivo
+queda abierto. Repitiendo la prueba con la excepción guardada en una variable, el
+resultado fue:
+
+```
+ANTES  (sin with): DESCRIPTOR COLGADO, el archivo sigue abierto
+DESPUES (con with): el archivo se cerro correctamente
+```
+
+En Windows eso significa que `datos_ejemplo.json` queda bloqueado y no se puede
+reemplazar ni borrar hasta que termine el proceso. La lección no es solo que
+`with` sea mejor estilo: es que el código anterior dependía, sin saberlo, de un
+comportamiento que el lenguaje no garantiza.
+
+**Decisión de diseño.** En `cargar_datos` el `open` se dejó **fuera** del `try`,
+igual que en el original. Meterlo dentro habría sido más corto, pero habría
+cambiado el comportamiento: un archivo que existe pero no se puede abrir (por
+permisos, o porque otro proceso lo tiene tomado) habría pasado a reportarse como
+«archivo corrupto» en vez de propagar el error real.
 
 **Validación de equivalencia.** La suite solo ejerce cuatro montos concretos, así
 que para comprobar que el comportamiento observable no cambió se comparó la
