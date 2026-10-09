@@ -340,4 +340,17 @@ Responde: ¿Qué tan útil fue Claude Code para detectar y corregir los problema
 ¿Qué propuso la IA que tú no habías notado? ¿En qué casos tuviste que corregir
 o rechazar sus sugerencias? ¿Qué aprendiste sobre refactorizar con apoyo de IA?
 
-*(Escribe aquí tu reflexión)*
+La verdad Claude Code me sirvió bastante, sobre todo al principio. Yo ya veía
+que el código estaba feo y el diagnóstico que me dio ordenado por prioridad estaba completo. Lo más útil no fue que escribiera código, sino que me dijera en qué orden convenía hacer las cosas: por ejemplo, borrar el código muerto antes que nada, porque si no iba a estar arreglando funciones que ni siquiera se usan. 
+De hecho al borrar `reporteViejoCSV` se me quitaron solitas dos advertencias del linter que si no me hubieran costado trabajo aparte. Lo que de plano no había notado era que el cálculo del descuento y el IVA estaba escrito dos veces, una en `registrar_venta` y otra en `cotizar`, y que el `5` del stock bajo estaba repetido en dos funciones de `reportes.py`. 
+
+En general yo diría que Claude Code es bastante útil para corregir problemas,
+pero no de la forma en que uno se imagina al principio. Donde mejor funciona es
+detectando cosas repetidas o inconsistentes que a simple vista se pasan, porque
+puede leerse todo el proyecto de un jalón y no se le va un detalle por cansancio
+como a uno. También es muy bueno para los cambios mecánicos, de esos que son
+fáciles pero largos y donde es facilísimo equivocarse tecleando, como renombrar
+algo que aparece en cuatro archivos. Lo que no hace es decidir por ti: no sabe
+qué parte del sistema es importante ni qué cosas no se pueden tocar, a menos que
+se lo digas tú, y por eso el `CLAUDE.md` terminó siendo clave.
+La IA propone muy rápido y casi siempre bien, pero el que tiene que entender qué está pasando y decidir si el cambio está bien soy yo.
