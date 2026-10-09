@@ -40,7 +40,43 @@ Después de cada cambio ejecuta `pytest` y anota el resultado.
 
 | 9  | (continuación del mismo plan) Renombrado descriptivo y estilo de nombres consistente | Se renombraron la función `hacer_cosa` → `formatear_moneda`, `hayArchivo` → `hay_archivo` y la global `contadorVentas` → `contador_ventas` (actualizando también `almacen.py`, que la lee y la escribe). Se sustituyeron los nombres de una letra y los `temp`/`aux` por nombres que dicen qué contienen: `nuevo_stock`, `valor_total`, `unidades_por_codigo`, `ranking`, `producto`, `venta`, `texto`, `datos`, `respuesta`. De paso, tres bucles que solo acumulaban en una lista se volvieron comprensiones, y `hay_archivo` pasó de un `if/else` que devolvía `True`/`False` a devolver la condición directamente. | Los nombres eran el obstáculo más persistente para leer el código: `temp2` designaba tres cosas distintas en tres funciones y `aux` cuatro, de modo que el lector no podía apoyarse en el nombre para saber qué tenía enfrente y debía reconstruirlo cada vez. `hacer_cosa` era el caso extremo: un nombre que oculta activamente que la función formatea moneda. El estilo también estaba mezclado —`contadorVentas` y `hayArchivo` en camelCase conviviendo con snake_case—, lo que obliga a recordar cuál es cuál al escribir. | 20/20 ✔ |
 
+| 10 | (cierre) `ruff check src --fix` | Se aplicaron las cinco correcciones automáticas restantes: se eliminaron las cuatro declaraciones `# -*- coding: utf-8 -*-` (innecesarias desde Python 3, donde UTF-8 es el default) y se ordenó el bloque de imports de `main.py`. | **Esto no es una refactorización significativa** y no se cuenta como tal: son cambios cosméticos que la herramienta aplica sola, y el README los descarta explícitamente. Se dejaron para el final a propósito, cuando la estructura ya no se movía, para que el ruido de formato no se mezclara con los diffs de los cambios que sí importaban. Con este paso `ruff check src` queda en cero, que es requisito del reto. | 20/20 ✔ |
+
 > Agrega más filas si realizas más de 5 refactorizaciones.
+
+## Resultado final
+
+| Métrica | Inicio | Final |
+|---------|--------|-------|
+| `pytest` | 20/20 | **20/20** |
+| `ruff check src` | 20 errores | **0 — `All checks passed!`** |
+| Funciones sobre el límite de complejidad | 2 (`menu` 17, `registrar_venta` 12) | **0** |
+| Complejidad de `menu` | 17 | 4 |
+| Complejidad de `registrar_venta` | 12 | 5 |
+| Lugares donde vive la regla de descuento+IVA | 2 | 1 |
+| Literales mágicos | 15 | 0 |
+| Nombres en camelCase (fuera de la API fijada) | 2 | 0 |
+| Funciones muertas | 4 | 0 |
+| Archivos abiertos sin `with` | 3 | 0 |
+
+**Refactorizaciones significativas aplicadas: 8** (las filas 2 a 9). Las filas 0,
+1 y 10 son configuración, diagnóstico y limpieza automática, y no se cuentan.
+
+### Cómo se verificó que el comportamiento no cambió
+
+La suite de pruebas es la red principal, pero solo cubre `gestor`, `almacen` y
+`reportes` con unos pocos valores concretos: no cubre `main.py` en absoluto. Para
+no refactorizar a ciegas se construyeron tres arneses de comparación que
+ejecutan la versión anterior y la nueva sobre las mismas entradas:
+
+| Arnés | Qué compara | Casos |
+|-------|-------------|-------|
+| Fórmula de cálculo | subtotal, descuento, impuesto y total contra la fórmula original | 8 569 |
+| Orden de validaciones | mensaje exacto en `ultimo_error` y ausencia de efectos laterales | 66 |
+| Menú interactivo | salida completa carácter por carácter y JSON guardado | 16 guiones |
+
+Los tres se reejecutaron tras cada cambio que pudiera afectarlos, y los tres
+dieron idéntico hasta el final.
 
 ### Detalle de la refactorización #2
 

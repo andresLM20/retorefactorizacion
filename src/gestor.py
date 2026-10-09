@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Modulo principal del gestor de inventario y ventas de "La Esquina".
 
 Aqui vive casi toda la logica del negocio. Historicamente este archivo
